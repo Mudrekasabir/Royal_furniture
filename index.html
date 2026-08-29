@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shop Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body{
+    --bg:#F6F2EC; --surface:#FFFFFF; --surface-alt:#EFE8DC; --ink:#2B2420; --ink-muted:#83725F;
+    --accent:#8B5E34; --accent-dark:#6B4423; --sage:#4C6B58; --sage-dark:#374F3E; --rust:#B3492D; --border:#E2D9C9;
+    font-family:'Inter',sans-serif; color:var(--ink); background:var(--bg);
+  }
+  #root{ min-height:100vh; display:flex; flex-direction:column; max-width:1080px; margin:0 auto; }
+  .mono{ font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; }
+  .strong{ font-weight:600; }
+
+  .loading-screen{ display:flex; align-items:center; gap:10px; justify-content:center; height:60vh; color:var(--ink-muted); font-size:14px; }
+  .spinner{ width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .login-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .login-card{ background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:32px 28px; width:100%; max-width:360px; text-align:center; }
+  .login-emoji{ font-size:32px; margin-bottom:6px; }
+  .login-card h1{ font-family:'Fraunces',serif; font-size:22px; margin:0 0 4px; }
+  .login-form{ display:flex; flex-direction:column; gap:12px; margin-top:18px; text-align:left; }
+  .btn.full{ width:100%; justify-content:center; }
+
+  .app-header{ display:flex; align-items:center; justify-content:space-between; padding:18px 20px 10px; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{ width:32px; height:32px; border-radius:8px; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .brand h1{ font-family:'Fraunces',serif; font-size:20px; font-weight:600; margin:0; cursor:pointer; letter-spacing:-0.01em; }
+  .brand-input{ font-family:'Fraunces',serif; font-size:20px; font-weight:600; border:none; border-bottom:1px dashed var(--accent); background:transparent; outline:none; color:var(--ink); }
+  .header-right{ display:flex; align-items:center; gap:14px; }
+  .header-date{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-muted); }
+  .logout-btn{ font-size:12px; color:var(--ink-muted); background:none; border:none; cursor:pointer; text-decoration:underline; }
+  .logout-btn:hover{ color:var(--ink); }
+
+  .app-nav{ display:flex; gap:4px; padding:6px; margin:0 20px 8px; background:var(--surface-alt); border-radius:12px; overflow-x:auto; }
+  .nav-btn{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:9px 4px; border:none; background:transparent; border-radius:9px; color:var(--ink-muted); font-size:11px; font-family:'Inter',sans-serif; cursor:pointer; transition:background .15s,color .15s; white-space:nowrap; }
+  .nav-btn.active{ background:var(--surface); color:var(--accent-dark); box-shadow:0 1px 2px rgba(43,36,32,0.08); font-weight:600; }
+  .nav-btn:hover:not(.active){ color:var(--ink); }
+  .nav-emoji{ font-size:16px; }
+
+  .app-main{ flex:1; padding:4px 20px 100px; }
+  .view-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+  .view-head h2{ font-family:'Fraunces',serif; font-size:24px; margin:0; font-weight:600; }
+  .view{ animation:fadein .2s ease; }
+  @keyframes fadein{ from{ opacity:0; transform:translateY(4px);} to{ opacity:1; transform:translateY(0);} }
+
+  .btn{ display:inline-flex; align-items:center; gap:6px; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:9px 14px; border-radius:8px; border:1px solid transparent; cursor:pointer; transition:opacity .15s, background .15s; }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .btn-accent{ background:var(--accent); color:#fff; }
+  .btn-accent:hover:not(:disabled){ background:var(--accent-dark); }
+  .btn-ghost{ background:transparent; border-color:var(--border); color:var(--ink); }
+  .btn-ghost:hover{ background:var(--surface-alt); }
+
+  .icon-btn{ border:none; background:transparent; color:var(--ink-muted); cursor:pointer; padding:6px; border-radius:6px; display:inline-flex; font-size:14px; }
+  .icon-btn:hover{ background:var(--surface-alt); color:var(--ink); }
+
+  .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
+  .stat-card{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; position:relative; }
+  .stat-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .stat-label{ font-size:12px; color:var(--ink-muted); }
+  .stat-value{ font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; }
+  .stat-sub{ font-size:11px; color:var(--ink-muted); margin-top:4px; }
+  .tone-accent{ color:var(--accent-dark); }
+  .tone-sage{ color:var(--sage-dark); }
+  .tone-rust{ color:var(--rust); }
+  .tone-ink{ color:var(--ink); }
+
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:760px){ .two-col{ grid-template-columns:1fr; } }
+
+  .panel{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .panel h3{ font-family:'Fraunces',serif; font-size:15px; margin:0 0 10px; font-weight:600; }
+  .muted-note{ font-size:13px; color:var(--ink-muted); }
+
+  .list{ list-style:none; margin:0; padding:0; }
+  .list-row{ display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--border); }
+  .list-row:last-child{ border-bottom:none; }
+  .row-title{ font-size:13px; font-weight:600; }
+  .row-sub{ font-size:11px; color:var(--ink-muted); margin-top:2px; }
+  .row-amount{ font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px; }
+
+  .tag{ font-size:11px; font-weight:600; padding:3px 9px; border-radius:100px; white-space:nowrap; }
+  .tag-rust{ background:#F5E3DC; color:var(--rust); }
+  .tag-sage{ background:#E2E9E4; color:var(--sage-dark); }
+
+  .empty-state{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:48px 20px; color:var(--ink-muted); border:1px dashed var(--border); border-radius:14px; background:var(--surface); }
+  .empty-state h3{ font-family:'Fraunces',serif; color:var(--ink); font-size:17px; margin:4px 0 0; }
+  .empty-state p{ font-size:13px; max-width:320px; margin:0 0 6px; }
+
+  .toolbar{ display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .search-box{ display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px 10px; flex:1; min-width:180px; color:var(--ink-muted); }
+  .search-box input{ border:none; outline:none; background:transparent; font-size:13px; width:100%; color:var(--ink); }
+  .select{ border:1px solid var(--border); background:var(--surface); border-radius:8px; padding:8px 10px; font-size:13px; color:var(--ink); }
+  .select.full{ width:100%; }
+
+  .stock-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; }
+  .stock-tag{ position:relative; background:var(--surface); border:1px solid var(--border); border-radius:10px 10px 10px 2px; padding:14px 14px 14px 22px; }
+  .stock-tag.low{ border-color:#E3B7A6; }
+  .stock-tag-hole{ position:absolute; top:14px; left:-1px; width:10px; height:10px; border-radius:50%; background:var(--bg); border:1px solid var(--border); }
+  .stock-tag::before{ content:""; position:absolute; inset:6px; border:1px dashed var(--border); border-radius:7px 7px 7px 2px; pointer-events:none; }
+  .stock-tag-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
+  .stock-name{ font-weight:600; font-size:14px; }
+  .stock-cat{ font-size:11px; color:var(--ink-muted); margin-top:1px; }
+  .stock-actions{ display:flex; gap:2px; }
+  .stock-details{ display:flex; flex-direction:column; gap:2px; font-size:11px; color:var(--ink-muted); margin:8px 0; }
+  .stock-foot{ display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
+
+  .supplier-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .supplier-actions{ display:flex; align-items:center; gap:4px; }
+  .supplier-btns{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .supplier-list{ display:flex; flex-direction:column; }
+
+  .ledger-card{ position:relative; }
+  .ledger-card::before{ content:""; position:absolute; inset:5px; border:1px dashed var(--border); border-radius:9px; pointer-events:none; }
+  .table-wrap{ overflow-x:auto; }
+  .ledger-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .ledger-table th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-muted); padding:8px 10px; border-bottom:1px solid var(--border); }
+  .ledger-table td{ padding:9px 10px; border-bottom:1px dashed var(--border); }
+  .ledger-table tr:last-child td{ border-bottom:none; }
+
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(43,36,32,0.45); display:flex; align-items:flex-end; justify-content:center; z-index:50; }
+  .modal-panel{ background:var(--surface); width:100%; max-width:480px; border-radius:16px 16px 0 0; max-height:88vh; overflow-y:auto; padding-bottom:8px; }
+  @media (min-width:640px){ .modal-backdrop{ align-items:center; } .modal-panel{ border-radius:16px; } }
+  .modal-head{ display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); border-radius:16px 16px 0 0; }
+  .modal-head h3{ font-family:'Fraunces',serif; font-size:17px; margin:0; }
+  .modal-body{ padding:16px 18px; }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:16px; }
+
+  .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:480px){ .form-grid{ grid-template-columns:1fr; } }
+  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field.full-width{ grid-column:1 / -1; }
+  .field-label{ font-size:11px; font-weight:600; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.02em; }
+  .input{ border:1px solid var(--border); border-radius:8px; padding:9px 10px; font-size:13px; font-family:'Inter',sans-serif; color:var(--ink); outline:none; width:100%; }
+  .input:focus{ border-color:var(--accent); }
+  .total-preview{ margin-top:12px; font-size:13px; padding:10px 12px; background:var(--surface-alt); border-radius:8px; }
+  .form-error{ margin-top:4px; font-size:12px; color:var(--rust); background:#F5E3DC; padding:8px 10px; border-radius:8px; }
+
+  .bar-chart{ display:flex; align-items:flex-end; gap:16px; height:220px; padding:10px 4px 0; overflow-x:auto; }
+  .bar-group{ display:flex; flex-direction:column; align-items:center; gap:8px; min-width:44px; height:100%; justify-content:flex-end; }
+  .bars{ display:flex; align-items:flex-end; gap:4px; height:180px; }
+  .bar{ width:14px; border-radius:3px 3px 0 0; min-height:2px; }
+  .bar-accent{ background:var(--accent); }
+  .bar-sage{ background:var(--sage); }
+  .bar-label{ font-size:10px; color:var(--ink-muted); white-space:nowrap; }
+  .bar-legend{ display:flex; gap:16px; font-size:11px; color:var(--ink-muted); margin-top:8px; align-items:center; }
+  .dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+  .dot-accent{ background:var(--accent); }
+  .dot-sage{ background:var(--sage); }
+
+  .supplier-summary{ display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
+  .summary-chip{ flex:1; min-width:130px; background:var(--surface-alt); border-radius:9px; padding:9px 12px; }
+  .summary-chip .summary-label{ font-size:10px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.03em; }
+  .summary-chip .summary-value{ font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px; margin-top:2px; }
+  .section-subhead{ display:flex; align-items:center; justify-content:space-between; margin:16px 0 8px; }
+  .section-subhead h4{ font-family:'Fraunces',serif; font-size:13px; font-weight:600; margin:0; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.03em; }
+  .file-drop{ border:1px dashed var(--border); border-radius:8px; padding:14px; font-size:12px; color:var(--ink-muted); text-align:center; cursor:pointer; transition:background .15s,border-color .15s; }
+  .file-drop:hover{ background:var(--surface-alt); border-color:var(--accent); }
+  .file-drop input{ display:none; }
+  .attachment-list{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .attachment-chip{ display:inline-flex; align-items:center; gap:6px; background:var(--surface-alt); border:1px solid var(--border); border-radius:100px; padding:4px 6px 4px 10px; font-size:11px; max-width:220px; }
+  .attachment-chip span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; text-decoration:underline; }
+  .attachment-chip button{ border:none; background:none; cursor:pointer; color:var(--ink-muted); font-size:13px; line-height:1; padding:2px 4px; }
+  .attachment-chip button:hover{ color:var(--rust); }
+  .attachment-badge{ font-size:10px; color:var(--ink-muted); display:inline-flex; align-items:center; gap:3px; }
+  .empty-row{ font-size:12px; color:var(--ink-muted); padding:10px 0; text-align:center; }
+
+  /* ---- Ledger report ---- */
+  .ledger-toolbar{ display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:flex-end; }
+  .ledger-toolbar .field{ min-width:150px; }
+  .ledger-toolbar .field-label{ margin-bottom:1px; }
+  .ledger-export-btn{ margin-left:auto; }
+  .type-pill{ font-size:11px; font-weight:600; padding:3px 9px; border-radius:100px; white-space:nowrap; }
+  .type-pill.purchase{ background:#F5E3DC; color:var(--rust); }
+  .type-pill.payment{ background:#E2E9E4; color:var(--sage-dark); }
+  .balance-due{ color:var(--rust); }
+  .balance-clear{ color:var(--sage-dark); }
+
+  /* ---- Notify modal / challan ---- */
+  .textarea{ min-height:150px; resize:vertical; line-height:1.5; }
+  .challan-actions{ display:flex; gap:10px; margin:12px 0 4px; flex-wrap:wrap; }
+  .notify-hint{ font-size:12px; color:var(--ink-muted); margin-top:8px; background:var(--surface-alt); padding:9px 11px; border-radius:8px; }
+  .notif-status{ display:inline-flex; align-items:center; gap:4px; font-size:11px; }
+  .bell-btn{ font-size:13px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+const {
+  useState,
+  useEffect,
+  useMemo
+} = React;
+const {
+  createClient
+} = supabase;
+
+// =====================================================================
+// PASTE YOUR SUPABASE PROJECT DETAILS HERE (Settings -> API in Supabase)
+// =====================================================================
+const SUPABASE_URL = "https://zkdfiilwqckfcgpyzlki.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InprZGZpaWx3cWNrZmNncHl6bGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5ODgyMTEsImV4cCI6MjEwMzU2NDIxMX0.E8Wuah37DdD8H5CxMsn_JF4OjGsQy8Tlx3snk5vu6rA";
+// =====================================================================
+
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const LOW_STOCK_THRESHOLD = 3;
+
+// ---------- helpers ----------
+const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const fmtMoney = n => "\u20B9" + Math.round(Number(n) || 0).toLocaleString("en-IN");
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const monthKey = dateStr => (dateStr || todayStr()).slice(0, 7);
+const monthLabel = key => {
+  const [y, m] = key.split("-");
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-IN", {
+    month: "short",
+    year: "numeric"
+  });
+};
+const dateLabel = dateStr => new Date(dateStr).toLocaleDateString("en-IN", {
+  day: "numeric",
+  month: "short",
+  year: "numeric"
+});
+const h = React.createElement; // shorthand used by the newer components below
+
+// ---------- phone / messaging helpers ----------
+const digitsOnly = str => (str || "").replace(/\D/g, "");
+function toWhatsAppNumber(phone) {
+  const d = digitsOnly(phone);
+  if (!d) return "";
+  if (d.length === 10) return "91" + d; // bare 10-digit Indian mobile number
+  if (d.length === 11 && d.startsWith("0")) return "91" + d.slice(1);
+  return d; // assume it already includes a country code
+}
+function buildPaymentMessage({
+  shopName,
+  supplier,
+  txn,
+  dueAfter
+}) {
+  const lines = [shopName, "Payment Confirmation", "", `Dear ${supplier.name},`, `A payment of ${fmtMoney(txn.amount)} was made to you on ${dateLabel(txn.date)}.`];
+  if (txn.note) lines.push(`Mode / note: ${txn.note}`);
+  lines.push(`Challan no: ${txn.id.toUpperCase()}`);
+  lines.push(`Balance due after this payment: ${fmtMoney(Math.max(dueAfter, 0))}`);
+  lines.push("");
+  lines.push("The payment challan (and proof of payment, if attached) is shared separately with this message.");
+  lines.push("");
+  lines.push("Regards,");
+  lines.push(shopName);
+  return lines.join("\n");
+}
+
+// ---------- challan (receipt) image generator ----------
+function generateChallanDataUrl({
+  shopName,
+  supplier,
+  txn,
+  dueAfter
+}) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 640;
+  canvas.height = 760;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "#E2D9C9";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(12, 12, canvas.width - 24, canvas.height - 24);
+  ctx.fillStyle = "#2B2420";
+  ctx.font = "bold 26px sans-serif";
+  ctx.fillText(shopName, 44, 66);
+  ctx.fillStyle = "#83725F";
+  ctx.font = "13px sans-serif";
+  ctx.fillText("PAYMENT CHALLAN / RECEIPT", 44, 90);
+  ctx.strokeStyle = "#E2D9C9";
+  ctx.beginPath();
+  ctx.moveTo(44, 108);
+  ctx.lineTo(596, 108);
+  ctx.stroke();
+  let y = 150;
+  function row(label, value, opts) {
+    opts = opts || {};
+    ctx.font = "12px sans-serif";
+    ctx.fillStyle = "#83725F";
+    ctx.fillText(label.toUpperCase(), 44, y);
+    ctx.font = (opts.bold ? "bold 19px" : "16px") + " sans-serif";
+    ctx.fillStyle = opts.color || "#2B2420";
+    ctx.fillText(String(value), 44, y + 24);
+    y += 58;
+  }
+  row("Challan no.", txn.id.toUpperCase());
+  row("Date", dateLabel(txn.date));
+  row("Paid to", supplier.name);
+  if (supplier.contact) row("Supplier contact", supplier.contact);
+  row("Amount paid", fmtMoney(txn.amount), {
+    bold: true,
+    color: "#374F3E"
+  });
+  if (txn.note) row("Note / mode of payment", txn.note);
+  row("Balance due after this payment", fmtMoney(Math.max(dueAfter, 0)), {
+    bold: true,
+    color: dueAfter > 0 ? "#B3492D" : "#374F3E"
+  });
+  ctx.strokeStyle = "#E2D9C9";
+  ctx.beginPath();
+  ctx.moveTo(44, y + 6);
+  ctx.lineTo(596, y + 6);
+  ctx.stroke();
+  ctx.font = "11px sans-serif";
+  ctx.fillStyle = "#83725F";
+  ctx.fillText("This is a system-generated challan for internal record keeping.", 44, canvas.height - 46);
+  ctx.fillText(`${shopName} \u00B7 Generated ${dateLabel(todayStr())}`, 44, canvas.height - 26);
+  return canvas.toDataURL("image/png");
+}
+
+// ---------- CSV export ----------
+function escapeCSV(val) {
+  const s = String(val === null || val === undefined ? "" : val);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function downloadTextFile(filename, content, mime) {
+  const blob = new Blob([content], {
+    type: mime
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function downloadCSV(filename, rows) {
+  const csv = rows.map(r => r.map(escapeCSV).join(",")).join("\n");
+  downloadTextFile(filename, csv, "text/csv");
+}
+async function loadKey(userId, key, fallback) {
+  try {
+    const {
+      data,
+      error
+    } = await supabaseClient.from("app_data").select("value").eq("user_id", userId).eq("key", key).maybeSingle();
+    if (error || !data) return fallback;
+    return data.value;
+  } catch (e) {
+    return fallback;
+  }
+}
+async function saveKey(userId, key, value) {
+  try {
+    await supabaseClient.from("app_data").upsert({
+      user_id: userId,
+      key,
+      value,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: "user_id,key"
+    });
+  } catch (e) {
+    console.error("Save failed for", key, e);
+  }
+}
+
+// ---------- small UI atoms ----------
+function StatCard({
+  label,
+  value,
+  sub,
+  tone = "ink",
+  emoji
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-top"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "stat-label"
+  }, label), emoji && /*#__PURE__*/React.createElement("span", {
+    className: `tone-${tone}`,
+    style: {
+      fontSize: 15
+    }
+  }, emoji)), /*#__PURE__*/React.createElement("div", {
+    className: `stat-value tone-${tone}`
+  }, value), sub && /*#__PURE__*/React.createElement("div", {
+    className: "stat-sub"
+  }, sub));
+}
+function EmptyState({
+  emoji,
+  title,
+  body,
+  actionLabel,
+  onAction
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 28
+    }
+  }, emoji), /*#__PURE__*/React.createElement("h3", null, title), /*#__PURE__*/React.createElement("p", null, body), actionLabel && /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-accent",
+    onClick: onAction
+  }, "+ ", actionLabel));
+}
+function Modal({
+  title,
+  onClose,
+  children
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-backdrop",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-panel",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-head"
+  }, /*#__PURE__*/React.createElement("h3", null, title), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    onClick: onClose
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  }, children)));
+}
+function Field({
+  label,
+  children,
+  full
+}) {
+  return /*#__PURE__*/React.createElement("label", {
+    className: `field ${full ? "full-width" : ""}`
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "field-label"
+  }, label), children);
+}
+function MiniBarChart({
+  data
+}) {
+  const max = Math.max(1, ...data.flatMap(d => [d.revenue, d.profit]));
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "bar-chart"
+  }, data.map(d => /*#__PURE__*/React.createElement("div", {
+    className: "bar-group",
+    key: d.name
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bars"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bar bar-accent",
+    style: {
+      height: `${d.revenue / max * 100}%`
+    },
+    title: `Revenue: ${fmtMoney(d.revenue)}`
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "bar bar-sage",
+    style: {
+      height: `${d.profit / max * 100}%`
+    },
+    title: `Profit: ${fmtMoney(d.profit)}`
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "bar-label"
+  }, d.name)))), /*#__PURE__*/React.createElement("div", {
+    className: "bar-legend"
+  }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    className: "dot dot-accent"
+  }), "Revenue"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    className: "dot dot-sage"
+  }), "Profit")));
+}
+
+// ---------- auth ----------
+function useSession() {
+  const [session, setSession] = useState(undefined);
+  useEffect(() => {
+    supabaseClient.auth.getSession().then(({
+      data
+    }) => setSession(data.session));
+    const {
+      data: listener
+    } = supabaseClient.auth.onAuthStateChange((_event, sess) => setSession(sess));
+    return () => listener.subscription.unsubscribe();
+  }, []);
+  return session;
+}
+function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  async function submit(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    const {
+      error
+    } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+    setLoading(false);
+    if (error) setError(error.message);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "login-screen"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "login-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "login-emoji"
+  }, "🪑"), /*#__PURE__*/React.createElement("h1", null, "Shop Manager"), /*#__PURE__*/React.createElement("p", {
+    className: "muted-note"
+  }, "Sign in to manage your store."), /*#__PURE__*/React.createElement("form", {
+    className: "login-form",
+    onSubmit: submit
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Email"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "email",
+    value: email,
+    onChange: e => setEmail(e.target.value),
+    required: true
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Password"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "password",
+    value: password,
+    onChange: e => setPassword(e.target.value),
+    required: true
+  })), error && /*#__PURE__*/React.createElement("div", {
+    className: "form-error"
+  }, error), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-accent full",
+    disabled: loading
+  }, loading ? "Signing in…" : "Sign in"))));
+}
+function Root() {
+  const session = useSession();
+  if (session === undefined) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "loading-screen"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "spinner"
+    }), /*#__PURE__*/React.createElement("span", null, "Loading…"));
+  }
+  if (!session) return /*#__PURE__*/React.createElement(LoginScreen, null);
+  return /*#__PURE__*/React.createElement(FurnitureShopManager, {
+    userId: session.user.id,
+    onLogout: () => supabaseClient.auth.signOut()
+  });
+}
+
+// ---------- main app ----------
+function FurnitureShopManager({
+  userId,
+  onLogout
+}) {
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("dashboard");
+  const [shopName, setShopName] = useState("My Furniture Store");
+  const [editingShopName, setEditingShopName] = useState(false);
+  const [stock, setStock] = useState([]);
+  const [sales, setSales] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [txns, setTxns] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [notifyCtx, setNotifyCtx] = useState(null);
+  const [stockForm, setStockForm] = useState(null);
+  const [saleForm, setSaleForm] = useState(null);
+  const [supplierForm, setSupplierForm] = useState(null);
+  const [txnForm, setTxnForm] = useState(null);
+  const [stockSearch, setStockSearch] = useState("");
+  const [stockCategoryFilter, setStockCategoryFilter] = useState("All");
+  const [saleError, setSaleError] = useState("");
+  useEffect(() => {
+    (async () => {
+      const [s, sa, sup, t, name, notifs] = await Promise.all([loadKey(userId, "stock", []), loadKey(userId, "sales", []), loadKey(userId, "suppliers", []), loadKey(userId, "supplier_txns", []), loadKey(userId, "shop_name", null), loadKey(userId, "supplier_notifications", [])]);
+      setStock(s);
+      setSales(sa);
+      setSuppliers(sup);
+      setTxns(t);
+      setNotifications(notifs);
+      if (name) setShopName(name);
+      setLoading(false);
+    })();
+  }, [userId]);
+  const categories = useMemo(() => {
+    const set = new Set(stock.map(i => i.category).filter(Boolean));
+    return ["All", ...Array.from(set)];
+  }, [stock]);
+  const filteredStock = useMemo(() => {
+    return stock.filter(i => {
+      const matchesCat = stockCategoryFilter === "All" || i.category === stockCategoryFilter;
+      const q = stockSearch.trim().toLowerCase();
+      const matchesSearch = !q || i.name.toLowerCase().includes(q) || (i.supplier || "").toLowerCase().includes(q);
+      return matchesCat && matchesSearch;
+    });
+  }, [stock, stockSearch, stockCategoryFilter]);
+  const lowStockItems = useMemo(() => stock.filter(i => Number(i.quantity) <= LOW_STOCK_THRESHOLD), [stock]);
+  const todaySales = useMemo(() => sales.filter(s => s.date === todayStr()), [sales]);
+  const todayTotal = useMemo(() => todaySales.reduce((sum, s) => sum + s.total, 0), [todaySales]);
+  const thisMonthKey = monthKey(todayStr());
+  const thisMonthSales = useMemo(() => sales.filter(s => monthKey(s.date) === thisMonthKey), [sales, thisMonthKey]);
+  const thisMonthRevenue = useMemo(() => thisMonthSales.reduce((sum, s) => sum + s.total, 0), [thisMonthSales]);
+  const thisMonthProfit = useMemo(() => thisMonthSales.reduce((sum, s) => sum + (s.total - (s.costPriceAtSale || 0) * s.quantity), 0), [thisMonthSales]);
+  const supplierDue = supplierId => txns.filter(t => t.supplierId === supplierId).reduce((sum, t) => sum + (t.type === "purchase" ? t.amount : -t.amount), 0);
+  const totalDue = useMemo(() => suppliers.reduce((sum, s) => sum + supplierDue(s.id), 0), [suppliers, txns]);
+  const monthlyAgg = useMemo(() => {
+    const map = {};
+    sales.forEach(s => {
+      const k = monthKey(s.date);
+      if (!map[k]) map[k] = {
+        month: k,
+        revenue: 0,
+        cost: 0,
+        units: 0
+      };
+      map[k].revenue += s.total;
+      map[k].cost += (s.costPriceAtSale || 0) * s.quantity;
+      map[k].units += s.quantity;
+    });
+    return Object.values(map).sort((a, b) => a.month.localeCompare(b.month));
+  }, [sales]);
+  const chartData = monthlyAgg.slice(-6).map(m => ({
+    name: monthLabel(m.month),
+    revenue: m.revenue,
+    profit: m.revenue - m.cost
+  }));
+  const topItems = useMemo(() => {
+    const map = {};
+    sales.forEach(s => {
+      if (!map[s.itemName]) map[s.itemName] = {
+        name: s.itemName,
+        qty: 0,
+        revenue: 0
+      };
+      map[s.itemName].qty += s.quantity;
+      map[s.itemName].revenue += s.total;
+    });
+    return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 5);
+  }, [sales]);
+  function updateShopName(v) {
+    setShopName(v);
+    saveKey(userId, "shop_name", v);
+  }
+  function saveStock(item) {
+    let next;
+    if (item.id) next = stock.map(i => i.id === item.id ? item : i);else next = [...stock, {
+      ...item,
+      id: genId()
+    }];
+    setStock(next);
+    saveKey(userId, "stock", next);
+    setStockForm(null);
+  }
+  function deleteStock(id) {
+    const next = stock.filter(i => i.id !== id);
+    setStock(next);
+    saveKey(userId, "stock", next);
+  }
+  function submitSale(form) {
+    const item = stock.find(i => i.id === form.itemId);
+    if (!item) return setSaleError("Please select an item.");
+    const qty = Number(form.quantity);
+    if (!qty || qty <= 0) return setSaleError("Enter a valid quantity.");
+    if (qty > Number(item.quantity)) return setSaleError(`Only ${item.quantity} in stock.`);
+    const price = Number(form.price);
+    const record = {
+      id: genId(),
+      date: form.date || todayStr(),
+      itemId: item.id,
+      itemName: item.name,
+      quantity: qty,
+      price,
+      total: qty * price,
+      costPriceAtSale: Number(item.costPrice) || 0,
+      customer: form.customer || ""
+    };
+    const nextSales = [record, ...sales];
+    const nextStock = stock.map(i => i.id === item.id ? {
+      ...i,
+      quantity: Number(i.quantity) - qty
+    } : i);
+    setSales(nextSales);
+    setStock(nextStock);
+    saveKey(userId, "sales", nextSales);
+    saveKey(userId, "stock", nextStock);
+    setSaleForm(null);
+    setSaleError("");
+  }
+  function deleteSale(sale) {
+    const nextSales = sales.filter(s => s.id !== sale.id);
+    const nextStock = stock.map(i => i.id === sale.itemId ? {
+      ...i,
+      quantity: Number(i.quantity) + sale.quantity
+    } : i);
+    setSales(nextSales);
+    setStock(nextStock);
+    saveKey(userId, "sales", nextSales);
+    saveKey(userId, "stock", nextStock);
+  }
+  function saveSupplier(sup) {
+    let next;
+    if (sup.id) next = suppliers.map(s => s.id === sup.id ? sup : s);else next = [...suppliers, {
+      ...sup,
+      id: genId()
+    }];
+    setSuppliers(next);
+    saveKey(userId, "suppliers", next);
+    setSupplierForm(null);
+  }
+  function deleteSupplier(id) {
+    const next = suppliers.filter(s => s.id !== id);
+    const nextTxns = txns.filter(t => t.supplierId !== id);
+    setSuppliers(next);
+    setTxns(nextTxns);
+    saveKey(userId, "suppliers", next);
+    saveKey(userId, "supplier_txns", nextTxns);
+  }
+  function submitTxn(form) {
+    const qty = Number(form.quantity) || 0;
+    const rate = Number(form.rate) || 0;
+    const amount = form.type === "purchase" ? qty && rate ? qty * rate : Number(form.amount) || 0 : Number(form.amount) || 0;
+    let stockItemId = form.stockItemId || null;
+    let nextStock = stock;
+    if (form.type === "purchase" && qty > 0) {
+      if (stockItemId) {
+        // existing stock item — increase quantity, refresh cost price to latest purchase rate
+        nextStock = stock.map(i => i.id === stockItemId ? {
+          ...i,
+          quantity: Number(i.quantity) + qty,
+          costPrice: rate || i.costPrice
+        } : i);
+      } else if ((form.itemDescription || "").trim()) {
+        // no matching stock item — create a new one automatically
+        const supplierObj = suppliers.find(s => s.id === form.supplierId);
+        const newItem = {
+          id: genId(),
+          name: form.itemDescription.trim(),
+          category: "",
+          material: "",
+          dimensions: "",
+          supplier: supplierObj ? supplierObj.name : "",
+          quantity: qty,
+          costPrice: rate || 0,
+          sellingPrice: rate || 0
+        };
+        nextStock = [...stock, newItem];
+        stockItemId = newItem.id;
+      }
+      if (nextStock !== stock) {
+        setStock(nextStock);
+        saveKey(userId, "stock", nextStock);
+      }
+    }
+    const record = {
+      id: genId(),
+      supplierId: form.supplierId,
+      type: form.type,
+      amount,
+      date: form.date || todayStr(),
+      note: form.note || "",
+      itemDescription: form.itemDescription || "",
+      quantity: qty || null,
+      rate: rate || null,
+      attachments: form.attachments || [],
+      stockItemId
+    };
+    const next = [record, ...txns];
+    setTxns(next);
+    saveKey(userId, "supplier_txns", next);
+    setTxnForm(null);
+    if (record.type === "payment") {
+      const supplierObj = suppliers.find(s => s.id === record.supplierId);
+      if (supplierObj) {
+        const dueAfter = next.filter(t => t.supplierId === record.supplierId).reduce((sum, t) => sum + (t.type === "purchase" ? t.amount : -t.amount), 0);
+        setNotifyCtx({
+          txn: record,
+          supplier: supplierObj,
+          dueAfter
+        });
+      }
+    }
+  }
+  function recordNotification(channel, message, phone) {
+    if (!notifyCtx) return;
+    const entry = {
+      id: genId(),
+      txnId: notifyCtx.txn.id,
+      supplierId: notifyCtx.supplier.id,
+      channel,
+      message,
+      phone,
+      sentAt: new Date().toISOString()
+    };
+    const next = [entry, ...notifications];
+    setNotifications(next);
+    saveKey(userId, "supplier_notifications", next);
+  }
+  function openNotifyForTxn(txn) {
+    const supplierObj = suppliers.find(s => s.id === txn.supplierId);
+    if (!supplierObj) return;
+    const asc = txns.filter(t => t.supplierId === txn.supplierId).slice().sort((a, b) => a.date === b.date ? 0 : a.date < b.date ? -1 : 1);
+    let bal = 0,
+      dueAfter = 0;
+    for (const t of asc) {
+      bal += t.type === "purchase" ? t.amount : -t.amount;
+      if (t.id === txn.id) {
+        dueAfter = bal;
+        break;
+      }
+    }
+    setNotifyCtx({
+      txn,
+      supplier: supplierObj,
+      dueAfter
+    });
+  }
+  function deleteTxn(id) {
+    const txn = txns.find(t => t.id === id);
+    const next = txns.filter(t => t.id !== id);
+    setTxns(next);
+    saveKey(userId, "supplier_txns", next);
+    if (txn && txn.type === "purchase" && txn.stockItemId && txn.quantity) {
+      const nextStock = stock.map(i => i.id === txn.stockItemId ? {
+        ...i,
+        quantity: Math.max(0, Number(i.quantity) - txn.quantity)
+      } : i);
+      setStock(nextStock);
+      saveKey(userId, "stock", nextStock);
+    }
+  }
+  if (loading) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "loading-screen"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "spinner"
+    }), /*#__PURE__*/React.createElement("span", null, "Loading your shop data…"));
+  }
+  const NAV = [{
+    id: "dashboard",
+    label: "Dashboard",
+    emoji: "🗂️"
+  }, {
+    id: "sales",
+    label: "Sales",
+    emoji: "🛒"
+  }, {
+    id: "stock",
+    label: "Stock",
+    emoji: "📦"
+  }, {
+    id: "suppliers",
+    label: "Suppliers",
+    emoji: "👥"
+  }, {
+    id: "ledger",
+    label: "Ledger",
+    emoji: "🧾"
+  }, {
+    id: "reports",
+    label: "Reports",
+    emoji: "📊"
+  }];
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("header", {
+    className: "app-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "brand"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "brand-mark"
+  }, "🪑"), editingShopName ? /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    className: "brand-input",
+    value: shopName,
+    onChange: e => updateShopName(e.target.value),
+    onBlur: () => setEditingShopName(false),
+    onKeyDown: e => e.key === "Enter" && setEditingShopName(false)
+  }) : /*#__PURE__*/React.createElement("h1", {
+    onClick: () => setEditingShopName(true),
+    title: "Click to rename"
+  }, shopName)), /*#__PURE__*/React.createElement("div", {
+    className: "header-right"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "header-date"
+  }, "📅 ", dateLabel(todayStr())), /*#__PURE__*/React.createElement("button", {
+    className: "logout-btn",
+    onClick: onLogout
+  }, "Sign out"))), /*#__PURE__*/React.createElement("nav", {
+    className: "app-nav"
+  }, NAV.map(n => /*#__PURE__*/React.createElement("button", {
+    key: n.id,
+    className: `nav-btn ${tab === n.id ? "active" : ""}`,
+    onClick: () => setTab(n.id)
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "nav-emoji"
+  }, n.emoji), /*#__PURE__*/React.createElement("span", null, n.label)))), /*#__PURE__*/React.createElement("main", {
+    className: "app-main"
+  }, tab === "dashboard" && /*#__PURE__*/React.createElement(DashboardView, {
+    todayTotal: todayTotal,
+    todayCount: todaySales.length,
+    thisMonthRevenue: thisMonthRevenue,
+    thisMonthProfit: thisMonthProfit,
+    lowStockItems: lowStockItems,
+    totalDue: totalDue,
+    recentSales: sales.slice(0, 5),
+    onGoStock: () => setTab("stock"),
+    onAddSale: () => {
+      setSaleError("");
+      setSaleForm({});
+    }
+  }), tab === "sales" && /*#__PURE__*/React.createElement(SalesView, {
+    sales: sales,
+    onAdd: () => {
+      setSaleError("");
+      setSaleForm({});
+    },
+    onDelete: deleteSale,
+    hasStock: stock.length > 0
+  }), tab === "stock" && /*#__PURE__*/React.createElement(StockView, {
+    items: filteredStock,
+    allCount: stock.length,
+    categories: categories,
+    categoryFilter: stockCategoryFilter,
+    setCategoryFilter: setStockCategoryFilter,
+    search: stockSearch,
+    setSearch: setStockSearch,
+    onAdd: () => setStockForm({}),
+    onEdit: item => setStockForm(item),
+    onDelete: deleteStock
+  }), tab === "suppliers" && /*#__PURE__*/React.createElement(SuppliersView, {
+    suppliers: suppliers,
+    txns: txns,
+    supplierDue: supplierDue,
+    notifications: notifications,
+    onNotify: openNotifyForTxn,
+    onAdd: () => setSupplierForm({}),
+    onEdit: s => setSupplierForm(s),
+    onDelete: deleteSupplier,
+    onDeleteTxn: deleteTxn,
+    onTxn: (supplierId, type) => setTxnForm({
+      supplierId,
+      type,
+      amount: "",
+      date: todayStr(),
+      note: "",
+      itemDescription: "",
+      quantity: "",
+      rate: "",
+      attachments: [],
+      stockItemId: ""
+    })
+  }), tab === "ledger" && /*#__PURE__*/React.createElement(LedgerView, {
+    suppliers: suppliers,
+    txns: txns,
+    notifications: notifications,
+    shopName: shopName,
+    onNotify: openNotifyForTxn
+  }), tab === "reports" && /*#__PURE__*/React.createElement(ReportsView, {
+    monthlyAgg: monthlyAgg,
+    chartData: chartData,
+    topItems: topItems
+  })), stockForm !== null && /*#__PURE__*/React.createElement(StockFormModal, {
+    initial: stockForm,
+    suppliers: suppliers,
+    onClose: () => setStockForm(null),
+    onSave: saveStock
+  }), saleForm !== null && /*#__PURE__*/React.createElement(SaleFormModal, {
+    stock: stock,
+    error: saleError,
+    onClose: () => {
+      setSaleForm(null);
+      setSaleError("");
+    },
+    onSubmit: submitSale
+  }), supplierForm !== null && /*#__PURE__*/React.createElement(SupplierFormModal, {
+    initial: supplierForm,
+    onClose: () => setSupplierForm(null),
+    onSave: saveSupplier
+  }), txnForm !== null && /*#__PURE__*/React.createElement(TxnFormModal, {
+    form: txnForm,
+    supplierName: (suppliers.find(s => s.id === txnForm.supplierId) || {}).name,
+    stock: stock,
+    onClose: () => setTxnForm(null),
+    onSubmit: submitTxn
+  }), notifyCtx !== null && /*#__PURE__*/React.createElement(NotifyModal, {
+    ctx: notifyCtx,
+    shopName: shopName,
+    onClose: () => setNotifyCtx(null),
+    onSent: (channel, message, phone) => recordNotification(channel, message, phone)
+  }));
+}
+
+// ---------- Dashboard ----------
+function DashboardView({
+  todayTotal,
+  todayCount,
+  thisMonthRevenue,
+  thisMonthProfit,
+  lowStockItems,
+  totalDue,
+  recentSales,
+  onGoStock,
+  onAddSale
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "view"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "view-head"
+  }, /*#__PURE__*/React.createElement("h2", null, "Dashboard"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-accent",
+    onClick: onAddSale
+  }, "+ Record sale")), /*#__PURE__*/React.createElement("div", {
+    className: "stat-grid"
+  }, /*#__PURE__*/React.createElement(StatCard, {
+    label: "Today's sales",
+    value: fmtMoney(todayTotal),
+    sub: `${todayCount} transaction${todayCount === 1 ? "" : "s"}`,
+    tone: "accent",
+    emoji: "🛒"
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    label: "This month's revenue",
+    value: fmtMoney(thisMonthRevenue),
+    tone: "sage",
+    emoji: "↗"
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    label: "This month's profit",
+    value: fmtMoney(thisMonthProfit),
+    tone: "sage",
+    emoji: "↗"
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    label: "Owed to suppliers",
+    value: fmtMoney(totalDue),
+    tone: "rust",
+    emoji: "↘"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "two-col"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel"
+  }, /*#__PURE__*/React.createElement("h3", null, "Recent sales"), recentSales.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "muted-note"
+  }, "No sales recorded yet. Once you record a sale it'll show up here.") : /*#__PURE__*/React.createElement("ul", {
+    className: "list"
+  }, recentSales.map(s => /*#__PURE__*/React.createElement("li", {
+    key: s.id,
+    className: "list-row"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "row-title"
+  }, s.itemName), /*#__PURE__*/React.createElement("div", {
+    className: "row-sub"
+  }, dateLabel(s.date), " · qty ", s.quantity, s.customer ? ` · ${s.customer}` : "")), /*#__PURE__*/React.createElement("div", {
+    className: "row-amount"
+  }, fmtMoney(s.total)))))), /*#__PURE__*/React.createElement("div", {
+    className: "panel"
+  }, /*#__PURE__*/React.createElement("h3", null, "⚠️ Low stock"), lowStockItems.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "muted-note"
+  }, "Everything is well stocked (above ", LOW_STOCK_THRESHOLD, " units).") : /*#__PURE__*/React.createElement("ul", {
+    className: "list"
+  }, lowStockItems.map(i => /*#__PURE__*/React.createElement("li", {
+    key: i.id,
+    className: "list-row"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "row-title"
+  }, i.name), /*#__PURE__*/React.createElement("div", {
+    className: "row-sub"
+  }, i.category)), /*#__PURE__*/React.createElement("div", {
+    className: "tag tag-rust"
+  }, i.quantity, " left")))), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost",
+    style: {
+      marginTop: 12
+    },
+    onClick: onGoStock
+  }, "Manage stock →"))));
+}
+
+// ---------- Sales ----------
+function SalesView({
+  sales,
+  onAdd,
+  onDelete,
+  hasStock
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "view"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "view-head"
+  }, /*#__PURE__*/React.createElement("h2", null, "Sales"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-accent",
+    onClick: onAdd,
+    disabled: !hasStock
+  }, "+ Record sale")), !hasStock && /*#__PURE__*/React.createElement("p", {
+    className: "muted-note",
+    style: {
+      marginBottom: 12
+    }
+  }, "Add items to your stock first so you can record sales against them."), sales.length === 0 ? /*#__PURE__*/React.createElement(EmptyState, {
+    emoji: "🛒",
+    title: "No sales yet",
+    body: "Every sale you record will appear here, newest first.",
+    actionLabel: hasStock ? "Record your first sale" : null,
+    onAction: onAdd
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "table-wrap ledger-card"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "ledger-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Date"), /*#__PURE__*/React.createElement("th", null, "Item"), /*#__PURE__*/React.createElement("th", null, "Qty"), /*#__PURE__*/React.createElement("th", null, "Price"), /*#__PURE__*/React.createElement("th", null, "Customer"), /*#__PURE__*/React.createElement("th", null, "Total"), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, sales.map(s => /*#__PURE__*/React.createElement("tr", {
+    key: s.id
+  }, /*#__PURE__*/React.createElement("td", null, dateLabel(s.date)), /*#__PURE__*/React.createElement("td", null, s.itemName), /*#__PURE__*/React.createElement("td", {
+    className: "mono"
+  }, s.quantity), /*#__PURE__*/React.createElement("td", {
+    className: "mono"
+  }, fmtMoney(s.price)), /*#__PURE__*/React.createElement("td", null, s.customer || "—"), /*#__PURE__*/React.createElement("td", {
+    className: "mono strong"
+  }, fmtMoney(s.total)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    onClick: () => onDelete(s),
+    title: "Delete & restock"
+  }, "🗑"))))))));
+}
+
+// ---------- Stock ----------
+function StockView({
+  items,
+  allCount,
+  categories,
+  categoryFilter,
+  setCategoryFilter,
+  search,
+  setSearch,
+  onAdd,
+  onEdit,
+  onDelete
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "view"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "view-head"
+  }, /*#__PURE__*/React.createElement("h2", null, "Stock"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-accent",
+    onClick: onAdd
+  }, "+ Add item")), allCount > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "toolbar"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "search-box"
+  }, "🔍", /*#__PURE__*/React.createElement("input", {
+    placeholder: "Search by name or supplier…",
+    value: search,
+    onChange: e => setSearch(e.target.value)
+  })), /*#__PURE__*/React.createElement("select", {
+    className: "select",
+    value: categoryFilter,
+    onChange: e => setCategoryFilter(e.target.value)
+  }, categories.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c,
+    value: c
+  }, c)))), allCount === 0 ? /*#__PURE__*/React.createElement(EmptyState, {
+    emoji: "📦",
+    title: "No stock yet",
+    body: "Add your furniture items — name, category, material, dimensions, supplier and price — to start tracking stock.",
+    actionLabel: "Add your first item",
+    onAction: onAdd
+  }) : items.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "muted-note"
+  }, "No items match your search.") : /*#__PURE__*/React.createElement("div", {
+    className: "stock-grid"
+  }, items.map(i => /*#__PURE__*/React.createElement("div", {
+    key: i.id,
+    className: `stock-tag ${Number(i.quantity) <= LOW_STOCK_THRESHOLD ? "low" : ""}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stock-tag-hole"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "stock-tag-top"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "stock-name"
+  }, i.name), /*#__PURE__*/React.createElement("div", {
+    className: "stock-cat"
+  }, i.category || "Uncategorised")), /*#__PURE__*/React.createElement("div", {
+    className: "stock-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    onClick: () => onEdit(i)
+  }, "✎"), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    onClick: () => onDelete(i.id)
+  }, "🗑"))), /*#__PURE__*/React.createElement("div", {
+    className: "stock-details"
+  }, i.material && /*#__PURE__*/React.createElement("span", null, i.material), i.dimensions && /*#__PURE__*/React.createElement("span", null, i.dimensions), i.supplier && /*#__PURE__*/React.createElement("span", null, "From ", i.supplier)), /*#__PURE__*/React.createElement("div", {
+    className: "stock-foot"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: `tag ${Number(i.quantity) <= LOW_STOCK_THRESHOLD ? "tag-rust" : "tag-sage"}`
+  }, i.quantity, " in stock"), /*#__PURE__*/React.createElement("span", {
+    className: "mono strong"
+  }, fmtMoney(i.sellingPrice)))))));
+}
+
+// ---------- Suppliers ----------
+function openAttachment(att) {
+  const w = window.open();
+  if (att.type && att.type.startsWith("image/")) {
+    w.document.write(`<title>${att.name}</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${att.dataUrl}" style="max-width:100%;max-height:100vh;" /></body>`);
+  } else {
+    w.location.href = att.dataUrl;
+  }
+}
+function SuppliersView({
+  suppliers,
+  txns,
+  supplierDue,
+  notifications,
+  onNotify,
+  onAdd,
+  onEdit,
+  onDelete,
+  onTxn,
+  onDeleteTxn
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "view"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "view-head"
+  }, /*#__PURE__*/React.createElement("h2", null, "Suppliers"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-accent",
+    onClick: onAdd
+  }, "+ Add supplier")), suppliers.length === 0 ? /*#__PURE__*/React.createElement(EmptyState, {
+    emoji: "👥",
+    title: "No suppliers yet",
+    body: "Add suppliers to track purchases and payments, and see what you owe each of them.",
+    actionLabel: "Add your first supplier",
+    onAction: onAdd
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "supplier-list"
+  }, suppliers.map(s => {
+    const supplierTxns = txns.filter(t => t.supplierId === s.id);
+    const goodsEntries = supplierTxns.filter(t => t.type === "purchase").sort((a, b) => a.date < b.date ? 1 : -1);
+    const payments = supplierTxns.filter(t => t.type === "payment").sort((a, b) => a.date < b.date ? 1 : -1);
+    const totalGoods = goodsEntries.reduce((sum, t) => sum + t.amount, 0);
+    const totalPaid = payments.reduce((sum, t) => sum + t.amount, 0);
+    const due = totalGoods - totalPaid;
+    return /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      className: "panel ledger-card"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "supplier-head"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "row-title"
+    }, s.name), /*#__PURE__*/React.createElement("div", {
+      className: "row-sub"
+    }, s.contact || "No contact on file")), /*#__PURE__*/React.createElement("div", {
+      className: "supplier-actions"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: `tag ${due > 0 ? "tag-rust" : "tag-sage"}`
+    }, due > 0 ? `Due ${fmtMoney(due)}` : "Settled"), /*#__PURE__*/React.createElement("button", {
+      className: "icon-btn",
+      onClick: () => onEdit(s)
+    }, "✎"), /*#__PURE__*/React.createElement("button", {
+      className: "icon-btn",
+      onClick: () => onDelete(s.id)
+    }, "🗑"))), /*#__PURE__*/React.createElement("div", {
+      className: "supplier-summary"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "summary-chip"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "summary-label"
+    }, "Total goods value"), /*#__PURE__*/React.createElement("div", {
+      className: "summary-value tone-ink"
+    }, fmtMoney(totalGoods))), /*#__PURE__*/React.createElement("div", {
+      className: "summary-chip"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "summary-label"
+    }, "Given / paid"), /*#__PURE__*/React.createElement("div", {
+      className: "summary-value tone-sage"
+    }, fmtMoney(totalPaid))), /*#__PURE__*/React.createElement("div", {
+      className: "summary-chip"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "summary-label"
+    }, "Remaining amount"), /*#__PURE__*/React.createElement("div", {
+      className: "summary-value tone-rust"
+    }, fmtMoney(due)))), /*#__PURE__*/React.createElement("div", {
+      className: "supplier-btns"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost",
+      onClick: () => onTxn(s.id, "purchase")
+    }, "+ Add goods entry"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-ghost",
+      onClick: () => onTxn(s.id, "payment")
+    }, "+ Add payment")), /*#__PURE__*/React.createElement("div", {
+      className: "section-subhead"
+    }, /*#__PURE__*/React.createElement("h4", null, "Goods entries")), goodsEntries.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      className: "empty-row"
+    }, "No goods entries yet.") : /*#__PURE__*/React.createElement("div", {
+      className: "table-wrap"
+    }, /*#__PURE__*/React.createElement("table", {
+      className: "ledger-table"
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Date"), /*#__PURE__*/React.createElement("th", null, "Item"), /*#__PURE__*/React.createElement("th", null, "Qty"), /*#__PURE__*/React.createElement("th", null, "Rate"), /*#__PURE__*/React.createElement("th", null, "Total"), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, goodsEntries.map(t => /*#__PURE__*/React.createElement("tr", {
+      key: t.id
+    }, /*#__PURE__*/React.createElement("td", null, dateLabel(t.date)), /*#__PURE__*/React.createElement("td", null, t.itemDescription || t.note || "—"), /*#__PURE__*/React.createElement("td", {
+      className: "mono"
+    }, t.quantity ?? "—"), /*#__PURE__*/React.createElement("td", {
+      className: "mono"
+    }, t.rate ? fmtMoney(t.rate) : "—"), /*#__PURE__*/React.createElement("td", {
+      className: "mono strong"
+    }, fmtMoney(t.amount)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
+      className: "icon-btn",
+      onClick: () => onDeleteTxn(t.id)
+    }, "🗑"))))))), /*#__PURE__*/React.createElement("div", {
+      className: "section-subhead"
+    }, /*#__PURE__*/React.createElement("h4", null, "Payments")), payments.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      className: "empty-row"
+    }, "No payments recorded yet.") : /*#__PURE__*/React.createElement("div", {
+      className: "table-wrap"
+    }, /*#__PURE__*/React.createElement("table", {
+      className: "ledger-table"
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Date"), /*#__PURE__*/React.createElement("th", null, "Amount given"), /*#__PURE__*/React.createElement("th", null, "Note"), /*#__PURE__*/React.createElement("th", null, "Proof"), /*#__PURE__*/React.createElement("th", null, "Notify"), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, payments.map(t => {
+      const notified = notifications && notifications.some(n => n.txnId === t.id);
+      return /*#__PURE__*/React.createElement("tr", {
+        key: t.id
+      }, /*#__PURE__*/React.createElement("td", null, dateLabel(t.date)), /*#__PURE__*/React.createElement("td", {
+        className: "mono strong tone-sage"
+      }, fmtMoney(t.amount)), /*#__PURE__*/React.createElement("td", null, t.note || "—"), /*#__PURE__*/React.createElement("td", null, t.attachments && t.attachments.length > 0 ? /*#__PURE__*/React.createElement("div", {
+        className: "attachment-list"
+      }, t.attachments.map(att => /*#__PURE__*/React.createElement("span", {
+        key: att.id,
+        className: "attachment-badge",
+        style: {
+          cursor: "pointer",
+          textDecoration: "underline"
+        },
+        onClick: () => openAttachment(att)
+      }, "📎 ", att.name))) : "—"), /*#__PURE__*/React.createElement("td", null, notified ? /*#__PURE__*/React.createElement("span", {
+        className: "tag tag-sage notif-status"
+      }, "✓ Notified") : /*#__PURE__*/React.createElement("button", {
+        className: "btn btn-ghost bell-btn",
+        onClick: () => onNotify(t)
+      }, "🔔 Notify")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
+        className: "icon-btn",
+        onClick: () => onDeleteTxn(t.id)
+      }, "🗑")));
+    })))));
+  })));
+}
+
+// ---------- Reports ----------
+function ReportsView({
+  monthlyAgg,
+  chartData,
+  topItems
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "view"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "view-head"
+  }, /*#__PURE__*/React.createElement("h2", null, "Reports")), monthlyAgg.length === 0 ? /*#__PURE__*/React.createElement(EmptyState, {
+    emoji: "📊",
+    title: "No data yet",
+    body: "Record a few sales and your monthly reports will show up here."
+  }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "panel"
+  }, /*#__PURE__*/React.createElement("h3", null, "Revenue & profit — last 6 months"), /*#__PURE__*/React.createElement(MiniBarChart, {
+    data: chartData
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "two-col"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel ledger-card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Monthly summary"), /*#__PURE__*/React.createElement("div", {
+    className: "table-wrap"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "ledger-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Month"), /*#__PURE__*/React.createElement("th", null, "Revenue"), /*#__PURE__*/React.createElement("th", null, "Profit"), /*#__PURE__*/React.createElement("th", null, "Units"))), /*#__PURE__*/React.createElement("tbody", null, monthlyAgg.slice().reverse().map(m => /*#__PURE__*/React.createElement("tr", {
+    key: m.month
+  }, /*#__PURE__*/React.createElement("td", null, monthLabel(m.month)), /*#__PURE__*/React.createElement("td", {
+    className: "mono"
+  }, fmtMoney(m.revenue)), /*#__PURE__*/React.createElement("td", {
+    className: "mono"
+  }, fmtMoney(m.revenue - m.cost)), /*#__PURE__*/React.createElement("td", {
+    className: "mono"
+  }, m.units))))))), /*#__PURE__*/React.createElement("div", {
+    className: "panel"
+  }, /*#__PURE__*/React.createElement("h3", null, "Top selling items"), topItems.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "muted-note"
+  }, "No sales yet.") : /*#__PURE__*/React.createElement("ul", {
+    className: "list"
+  }, topItems.map(t => /*#__PURE__*/React.createElement("li", {
+    key: t.name,
+    className: "list-row"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "row-title"
+  }, t.name), /*#__PURE__*/React.createElement("div", {
+    className: "row-sub"
+  }, t.qty, " sold")), /*#__PURE__*/React.createElement("div", {
+    className: "row-amount"
+  }, fmtMoney(t.revenue)))))))));
+}
+
+// ---------- Forms ----------
+function StockFormModal({
+  initial,
+  suppliers,
+  onClose,
+  onSave
+}) {
+  const [f, setF] = useState({
+    id: initial.id || null,
+    name: initial.name || "",
+    category: initial.category || "",
+    material: initial.material || "",
+    dimensions: initial.dimensions || "",
+    supplier: initial.supplier || "",
+    quantity: initial.quantity ?? "",
+    costPrice: initial.costPrice ?? "",
+    sellingPrice: initial.sellingPrice ?? ""
+  });
+  const set = k => e => setF({
+    ...f,
+    [k]: e.target.value
+  });
+  const valid = f.name.trim() && f.quantity !== "" && f.sellingPrice !== "";
+  return /*#__PURE__*/React.createElement(Modal, {
+    title: initial.id ? "Edit item" : "Add stock item",
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "form-grid"
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Item name"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    value: f.name,
+    onChange: set("name"),
+    placeholder: "e.g. 3-Seater Sofa"
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Category"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    list: "cat-list",
+    value: f.category,
+    onChange: set("category"),
+    placeholder: "e.g. Sofa, Bed, Table"
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "cat-list"
+  }, ["Sofa", "Bed", "Table", "Chair", "Wardrobe", "Cabinet", "Dining Set", "Recliner"].map(c => /*#__PURE__*/React.createElement("option", {
+    key: c,
+    value: c
+  })))), /*#__PURE__*/React.createElement(Field, {
+    label: "Material"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    value: f.material,
+    onChange: set("material"),
+    placeholder: "e.g. Sheesham wood, Velvet"
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Dimensions"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    value: f.dimensions,
+    onChange: set("dimensions"),
+    placeholder: "e.g. 72in x 34in x 30in"
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Supplier"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    list: "sup-list",
+    value: f.supplier,
+    onChange: set("supplier"),
+    placeholder: "Supplier name"
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "sup-list"
+  }, suppliers.map(s => /*#__PURE__*/React.createElement("option", {
+    key: s.id,
+    value: s.name
+  })))), /*#__PURE__*/React.createElement(Field, {
+    label: "Quantity in stock"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "number",
+    min: "0",
+    value: f.quantity,
+    onChange: set("quantity")
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Cost price (₹)"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "number",
+    min: "0",
+    value: f.costPrice,
+    onChange: set("costPrice")
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Selling price (₹)"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "number",
+    min: "0",
+    value: f.sellingPrice,
+    onChange: set("sellingPrice")
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-accent",
+    disabled: !valid,
+    onClick: () => onSave({
+      ...f,
+      quantity: Number(f.quantity) || 0,
+      costPrice: Number(f.costPrice) || 0,
+      sellingPrice: Number(f.sellingPrice) || 0
+    })
+  }, initial.id ? "Save changes" : "Add item")));
+}
+function SaleFormModal({
+  stock,
+  error,
+  onClose,
+  onSubmit
+}) {
+  const [f, setF] = useState({
+    itemId: "",
+    quantity: 1,
+    price: "",
+    date: todayStr(),
+    customer: ""
+  });
+  const selected = stock.find(i => i.id === f.itemId);
+  useEffect(() => {
+    if (selected) setF(prev => ({
+      ...prev,
+      price: selected.sellingPrice
+    }));
+  }, [f.itemId]); // eslint-disable-line
+  return /*#__PURE__*/React.createElement(Modal, {
+    title: "Record a sale",
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "form-grid"
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Item",
+    full: true
+  }, /*#__PURE__*/React.createElement("select", {
+    className: "select full",
+    value: f.itemId,
+    onChange: e => setF({
+      ...f,
+      itemId: e.target.value
+    })
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select an item…"), stock.map(i => /*#__PURE__*/React.createElement("option", {
+    key: i.id,
+    value: i.id,
+    disabled: i.quantity <= 0
+  }, i.name, " (", i.quantity, " in stock)")))), /*#__PURE__*/React.createElement(Field, {
+    label: "Quantity"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "number",
+    min: "1",
+    value: f.quantity,
+    onChange: e => setF({
+      ...f,
+      quantity: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Price per unit (₹)"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "number",
+    min: "0",
+    value: f.price,
+    onChange: e => setF({
+      ...f,
+      price: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Date"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "date",
+    value: f.date,
+    onChange: e => setF({
+      ...f,
+      date: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Customer (optional)"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    value: f.customer,
+    onChange: e => setF({
+      ...f,
+      customer: e.target.value
+    }),
+    placeholder: "Name or phone"
+  }))), f.itemId && f.quantity && f.price && /*#__PURE__*/React.createElement("div", {
+    className: "total-preview"
+  }, "Total: ", /*#__PURE__*/React.createElement("span", {
+    className: "mono strong"
+  }, fmtMoney(Number(f.quantity) * Number(f.price)))), error && /*#__PURE__*/React.createElement("div", {
+    className: "form-error"
+  }, error), /*#__PURE__*/React.createElement("div", {
+    className: "modal-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-accent",
+    onClick: () => onSubmit(f)
+  }, "Record sale")));
+}
+function SupplierFormModal({
+  initial,
+  onClose,
+  onSave
+}) {
+  const [f, setF] = useState({
+    id: initial.id || null,
+    name: initial.name || "",
+    contact: initial.contact || "",
+    address: initial.address || ""
+  });
+  return /*#__PURE__*/React.createElement(Modal, {
+    title: initial.id ? "Edit supplier" : "Add supplier",
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "form-grid"
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Supplier name"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    value: f.name,
+    onChange: e => setF({
+      ...f,
+      name: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Contact (phone/email)"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    value: f.contact,
+    onChange: e => setF({
+      ...f,
+      contact: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Address (optional)"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    value: f.address,
+    onChange: e => setF({
+      ...f,
+      address: e.target.value
+    })
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-accent",
+    disabled: !f.name.trim(),
+    onClick: () => onSave(f)
+  }, initial.id ? "Save changes" : "Add supplier")));
+}
+const MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024; // 3MB per file, kept small since files live inline in your data
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+function TxnFormModal({
+  form,
+  supplierName,
+  stock,
+  onClose,
+  onSubmit
+}) {
+  const [f, setF] = useState(form);
+  const [fileError, setFileError] = useState("");
+  const isPurchase = form.type === "purchase";
+  const qty = Number(f.quantity) || 0;
+  const rate = Number(f.rate) || 0;
+  const computedTotal = qty && rate ? qty * rate : 0;
+  const identified = f.stockItemId || (f.itemDescription || "").trim();
+  const valid = isPurchase ? identified && (computedTotal > 0 || Number(f.amount) > 0) : Number(f.amount) > 0;
+  const linkedItem = isPurchase && f.stockItemId ? stock.find(i => i.id === f.stockItemId) : null;
+  function handleStockSelect(e) {
+    const id = e.target.value;
+    if (id) {
+      const item = stock.find(i => i.id === id);
+      setF(prev => ({
+        ...prev,
+        stockItemId: id,
+        itemDescription: item ? item.name : "",
+        rate: prev.rate || (item ? item.costPrice : "")
+      }));
+    } else {
+      setF(prev => ({
+        ...prev,
+        stockItemId: "",
+        itemDescription: ""
+      }));
+    }
+  }
+  async function handleFiles(e) {
+    setFileError("");
+    const files = Array.from(e.target.files || []);
+    const accepted = [];
+    for (const file of files) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        setFileError(`${file.name} is over 3MB and was skipped.`);
+        continue;
+      }
+      const dataUrl = await readFileAsDataURL(file);
+      accepted.push({
+        id: genId(),
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        dataUrl
+      });
+    }
+    setF(prev => ({
+      ...prev,
+      attachments: [...(prev.attachments || []), ...accepted]
+    }));
+    e.target.value = "";
+  }
+  function removeAttachment(id) {
+    setF(prev => ({
+      ...prev,
+      attachments: (prev.attachments || []).filter(a => a.id !== id)
+    }));
+  }
+  return /*#__PURE__*/React.createElement(Modal, {
+    title: `${isPurchase ? "Add goods entry from" : "Record payment to"} ${supplierName || "supplier"}`,
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "form-grid"
+  }, isPurchase ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Field, {
+    label: "Stock item",
+    full: true
+  }, /*#__PURE__*/React.createElement("select", {
+    className: "select full",
+    value: f.stockItemId || "",
+    onChange: handleStockSelect
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "+ New item (not in stock yet)"), stock.map(i => /*#__PURE__*/React.createElement("option", {
+    key: i.id,
+    value: i.id
+  }, i.name, " (", i.quantity, " in stock)")))), !f.stockItemId && /*#__PURE__*/React.createElement(Field, {
+    label: "New item name",
+    full: true
+  }, /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    className: "input",
+    value: f.itemDescription,
+    onChange: e => setF({
+      ...f,
+      itemDescription: e.target.value
+    }),
+    placeholder: "e.g. 10 dining chairs"
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Quantity"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "number",
+    min: "0",
+    value: f.quantity,
+    onChange: e => setF({
+      ...f,
+      quantity: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Rate per unit (₹)"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "number",
+    min: "0",
+    value: f.rate,
+    onChange: e => setF({
+      ...f,
+      rate: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Date"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "date",
+    value: f.date,
+    onChange: e => setF({
+      ...f,
+      date: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Note (optional)",
+    full: true
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    value: f.note,
+    onChange: e => setF({
+      ...f,
+      note: e.target.value
+    })
+  }))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Field, {
+    label: "Amount given (₹)"
+  }, /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    className: "input",
+    type: "number",
+    min: "0",
+    value: f.amount,
+    onChange: e => setF({
+      ...f,
+      amount: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Date"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "date",
+    value: f.date,
+    onChange: e => setF({
+      ...f,
+      date: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Note (optional)",
+    full: true
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    value: f.note,
+    onChange: e => setF({
+      ...f,
+      note: e.target.value
+    }),
+    placeholder: "e.g. Cash, UPI, cheque no."
+  })))), isPurchase && computedTotal > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "total-preview"
+  }, "Total: ", /*#__PURE__*/React.createElement("span", {
+    className: "mono strong"
+  }, fmtMoney(computedTotal))), isPurchase && qty > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "total-preview"
+  }, linkedItem ? `Stock update: "${linkedItem.name}" will go from ${linkedItem.quantity} → ${Number(linkedItem.quantity) + qty} units.` : f.itemDescription.trim() ? `A new stock item "${f.itemDescription.trim()}" will be created with ${qty} unit(s) in stock. You can set its selling price afterward in the Stock tab.` : ""), /*#__PURE__*/React.createElement(Field, {
+    label: isPurchase ? "Attach invoice / bill (optional)" : "Attach proof of payment (optional)",
+    full: true
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "file-drop"
+  }, "📎 Click to attach a file (image or PDF, up to 3MB)", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*,.pdf",
+    multiple: true,
+    onChange: handleFiles
+  }))), fileError && /*#__PURE__*/React.createElement("div", {
+    className: "form-error"
+  }, fileError), f.attachments && f.attachments.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "attachment-list"
+  }, f.attachments.map(a => /*#__PURE__*/React.createElement("span", {
+    key: a.id,
+    className: "attachment-chip"
+  }, /*#__PURE__*/React.createElement("span", {
+    onClick: () => openAttachment(a)
+  }, a.name), /*#__PURE__*/React.createElement("button", {
+    onClick: () => removeAttachment(a.id)
+  }, "✕")))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-accent",
+    disabled: !valid,
+    onClick: () => onSubmit(f)
+  }, "Save")));
+}
+
+// ---------- Purchase / Payment Ledger report ----------
+function LedgerView({
+  suppliers,
+  txns,
+  notifications,
+  shopName,
+  onNotify
+}) {
+  const [supplierFilter, setSupplierFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const supplierMap = useMemo(() => Object.fromEntries(suppliers.map(s => [s.id, s])), [suppliers]);
+  const filtered = useMemo(() => txns.filter(t => {
+    if (supplierFilter !== "all" && t.supplierId !== supplierFilter) return false;
+    if (typeFilter !== "all" && t.type !== typeFilter) return false;
+    if (fromDate && t.date < fromDate) return false;
+    if (toDate && t.date > toDate) return false;
+    return true;
+  }), [txns, supplierFilter, typeFilter, fromDate, toDate]);
+  const rows = useMemo(() => {
+    const asc = filtered.slice().sort((a, b) => a.date === b.date ? 0 : a.date < b.date ? -1 : 1);
+    let bal = 0;
+    const withBal = asc.map(t => {
+      bal += t.type === "purchase" ? t.amount : -t.amount;
+      return {
+        ...t,
+        runningBalance: bal
+      };
+    });
+    return withBal.reverse(); // newest first for display
+  }, [filtered]);
+  const totalPurchase = useMemo(() => filtered.filter(t => t.type === "purchase").reduce((s, t) => s + t.amount, 0), [filtered]);
+  const totalPaid = useMemo(() => filtered.filter(t => t.type === "payment").reduce((s, t) => s + t.amount, 0), [filtered]);
+  const netDue = totalPurchase - totalPaid;
+  const notifiedTxnIds = useMemo(() => new Set(notifications.map(n => n.txnId)), [notifications]);
+  function exportCSV() {
+    const header = ["Date", "Supplier", "Type", "Description", "Qty", "Rate", "Amount", "Balance After"];
+    const chronological = rows.slice().reverse();
+    const body = chronological.map(t => [t.date, (supplierMap[t.supplierId] || {}).name || "", t.type === "purchase" ? "Purchase" : "Payment", t.itemDescription || t.note || "", t.quantity ?? "", t.rate ?? "", t.amount, t.runningBalance]);
+    downloadCSV(`${(shopName || "shop").replace(/\s+/g, "_")}_ledger.csv`, [header, ...body]);
+  }
+  return h("div", {
+    className: "view"
+  }, h("div", {
+    className: "view-head"
+  }, h("h2", null, "Purchase & Payment Ledger"), h("button", {
+    className: "btn btn-ghost",
+    onClick: exportCSV,
+    disabled: rows.length === 0
+  }, "⬇ Export CSV")), h("div", {
+    className: "stat-grid"
+  }, h(StatCard, {
+    label: "Total goods purchased",
+    value: fmtMoney(totalPurchase),
+    tone: "ink",
+    emoji: "📥"
+  }), h(StatCard, {
+    label: "Total paid to suppliers",
+    value: fmtMoney(totalPaid),
+    tone: "sage",
+    emoji: "↗"
+  }), h(StatCard, {
+    label: "Net amount due",
+    value: fmtMoney(netDue),
+    tone: netDue > 0 ? "rust" : "sage",
+    emoji: "↘"
+  })), h("div", {
+    className: "ledger-toolbar"
+  }, h(Field, {
+    label: "Supplier"
+  }, h("select", {
+    className: "select",
+    value: supplierFilter,
+    onChange: e => setSupplierFilter(e.target.value)
+  }, h("option", {
+    value: "all"
+  }, "All suppliers"), suppliers.map(s => h("option", {
+    key: s.id,
+    value: s.id
+  }, s.name)))), h(Field, {
+    label: "Type"
+  }, h("select", {
+    className: "select",
+    value: typeFilter,
+    onChange: e => setTypeFilter(e.target.value)
+  }, h("option", {
+    value: "all"
+  }, "All entries"), h("option", {
+    value: "purchase"
+  }, "Purchases only"), h("option", {
+    value: "payment"
+  }, "Payments only"))), h(Field, {
+    label: "From"
+  }, h("input", {
+    className: "input",
+    type: "date",
+    value: fromDate,
+    onChange: e => setFromDate(e.target.value)
+  })), h(Field, {
+    label: "To"
+  }, h("input", {
+    className: "input",
+    type: "date",
+    value: toDate,
+    onChange: e => setToDate(e.target.value)
+  }))), rows.length === 0 ? h(EmptyState, {
+    emoji: "🧾",
+    title: "No ledger entries",
+    body: "Purchases and payments recorded against your suppliers will show up here as a running ledger."
+  }) : h("div", {
+    className: "table-wrap ledger-card"
+  }, h("table", {
+    className: "ledger-table"
+  }, h("thead", null, h("tr", null, h("th", null, "Date"), h("th", null, "Supplier"), h("th", null, "Description"), h("th", null, "Debit (Purchase)"), h("th", null, "Credit (Paid)"), h("th", null, "Balance"), h("th", null, "Notify / Proof"))), h("tbody", null, rows.map(t => {
+    const supplier = supplierMap[t.supplierId] || {
+      name: "—"
+    };
+    const isPurchase = t.type === "purchase";
+    const notified = notifiedTxnIds.has(t.id);
+    return h("tr", {
+      key: t.id
+    }, h("td", null, dateLabel(t.date)), h("td", null, supplier.name), h("td", null, t.itemDescription || t.note || "—", " ", h("span", {
+      className: `type-pill ${t.type}`,
+      style: {
+        marginLeft: 6
+      }
+    }, isPurchase ? "Purchase" : "Payment")), h("td", {
+      className: "mono"
+    }, isPurchase ? fmtMoney(t.amount) : "—"), h("td", {
+      className: "mono"
+    }, isPurchase ? "—" : fmtMoney(t.amount)), h("td", {
+      className: `mono strong ${t.runningBalance > 0 ? "balance-due" : "balance-clear"}`
+    }, fmtMoney(t.runningBalance)), h("td", null, !isPurchase && (notified ? h("span", {
+      className: "tag tag-sage notif-status"
+    }, "✓ Notified") : h("button", {
+      className: "btn btn-ghost bell-btn",
+      onClick: () => onNotify(t)
+    }, "🔔 Notify")), t.attachments && t.attachments.length > 0 && h("div", {
+      className: "attachment-list",
+      style: {
+        marginTop: 4
+      }
+    }, t.attachments.map(att => h("span", {
+      key: att.id,
+      className: "attachment-badge",
+      style: {
+        cursor: "pointer",
+        textDecoration: "underline"
+      },
+      onClick: () => openAttachment(att)
+    }, "📎 ", att.name)))));
+  })))));
+}
+
+// ---------- Notify supplier modal (challan + WhatsApp / SMS) ----------
+function NotifyModal({
+  ctx,
+  shopName,
+  onClose,
+  onSent
+}) {
+  const {
+    txn,
+    supplier,
+    dueAfter
+  } = ctx;
+  const [phone, setPhone] = useState(digitsOnly(supplier.contact || ""));
+  const [message, setMessage] = useState(buildPaymentMessage({
+    shopName,
+    supplier,
+    txn,
+    dueAfter
+  }));
+  const waNumber = toWhatsAppNumber(phone);
+  function downloadChallan() {
+    const dataUrl = generateChallanDataUrl({
+      shopName,
+      supplier,
+      txn,
+      dueAfter
+    });
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `challan-${txn.id}.png`;
+    a.click();
+  }
+  function sendWhatsApp() {
+    if (!waNumber) return;
+    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`, "_blank");
+    onSent("whatsapp", message, phone);
+  }
+  function sendSMS() {
+    if (!phone) return;
+    window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
+    onSent("sms", message, phone);
+  }
+  return h(Modal, {
+    title: `Notify ${supplier.name}`,
+    onClose
+  }, h("p", {
+    className: "muted-note"
+  }, "Payment of ", h("span", {
+    className: "mono strong"
+  }, fmtMoney(txn.amount)), " to ", supplier.name, " was recorded on ", dateLabel(txn.date), ". Send a confirmation with the payment challan attached."), h(Field, {
+    label: "Supplier phone number",
+    full: true
+  }, h("input", {
+    className: "input",
+    value: phone,
+    onChange: e => setPhone(e.target.value),
+    placeholder: "e.g. 9876543210"
+  })), h(Field, {
+    label: "Message text",
+    full: true
+  }, h("textarea", {
+    className: "input textarea",
+    rows: 8,
+    value: message,
+    onChange: e => setMessage(e.target.value)
+  })), h("div", {
+    className: "challan-actions"
+  }, h("button", {
+    className: "btn btn-ghost",
+    onClick: downloadChallan
+  }, "⬇ Download challan / proof image")), h("div", {
+    className: "notify-hint"
+  }, "Download the challan above, then attach it in WhatsApp or your messaging app along with the text — mobile browsers can't auto-attach files to a message."), h("div", {
+    className: "modal-actions"
+  }, h("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, "Done"), h("button", {
+    className: "btn btn-ghost",
+    disabled: !phone,
+    onClick: sendSMS
+  }, "💬 Send SMS"), h("button", {
+    className: "btn btn-accent",
+    disabled: !waNumber,
+    onClick: sendWhatsApp
+  }, "✅ Send via WhatsApp")));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(Root, null));
+</script>
+</body>
+</html>
